@@ -1,17 +1,13 @@
 {
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    },
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node@3",
+      "maxDuration": 30
     }
-  ],
+  },
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/build",
   "routes": [
     {
       "src": "/api/(.*)",
@@ -21,11 +17,5 @@
       "src": "/(.*)",
       "dest": "/frontend/build/$1"
     }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@3",
-      "maxDuration": 30
-    }
-  }
+  ]
 }
