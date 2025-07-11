@@ -34,6 +34,9 @@ const EmailForm: React.FC<EmailFormProps> = ({ onEmailSent }) => {
         setFormData({ to: '', from: '', subject: '', body: '' });
         setMessage('Email queued successfully!');
         onEmailSent();
+      } else if (response.status === 429) {
+        const errorData = await response.json();
+        setMessage(`Rate limit exceeded: ${errorData.message}. Please wait ${errorData.retryAfter} seconds.`);
       } else {
         const error = await response.json();
         setMessage(`Error: ${error.error}`);
@@ -100,7 +103,7 @@ const EmailForm: React.FC<EmailFormProps> = ({ onEmailSent }) => {
       </button>
 
       {message && (
-        <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>
+        <div className={`message ${message.includes('Error') || message.includes('Rate limit') ? 'error' : 'success'}`}>
           {message}
         </div>
       )}

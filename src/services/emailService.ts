@@ -10,6 +10,7 @@ export interface EmailMetrics {
   successRate: number;
   averageResponseTime: number;
   requestsThisMinute: number;
+  rateLimitedRequests: number;
 }
 
 export interface SystemLog {
@@ -33,7 +34,8 @@ export class EmailService {
     queueLength: 0,
     successRate: 0,
     averageResponseTime: 0,
-    requestsThisMinute: 0
+    requestsThisMinute: 0,
+    rateLimitedRequests: 0
   };
   private systemLogs: SystemLog[] = [];
   private responseTimeHistory: number[] = [];
@@ -48,6 +50,7 @@ export class EmailService {
     });
 
     this.addSystemLog('info', 'EmailService initialized with providers: ' + providers.map(p => p.name).join(', '));
+    this.addSystemLog('info', 'Rate limiting configured: 10 emails/minute, 120 monitoring requests/minute');
     this.processQueue();
     this.startMetricsCollection();
   }
@@ -93,6 +96,13 @@ export class EmailService {
     if (this.responseTimeHistory.length > 0) {
       this.metrics.averageResponseTime = this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length;
     }
+  }
+
+  // Method to increment failed attempts (called by rate limiter)
+  incrementFailedAttempts() {
+    this.metrics.totalFailed++;
+    this.metrics.rateLimitedRequests++;
+    this.addSystemLog('warn', 'Email request blocked due to rate limiting');
   }
 
   async sendEmail(emailData: Omit<EmailRequest, 'id' | 'timestamp'>): Promise<EmailResponse> {

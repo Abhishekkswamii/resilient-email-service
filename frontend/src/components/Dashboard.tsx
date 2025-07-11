@@ -22,7 +22,8 @@ const Dashboard: React.FC = () => {
       queueLength: 0,
       successRate: 100,
       averageResponseTime: 0,
-      requestsThisMinute: 0
+      requestsThisMinute: 0,
+      rateLimitedRequests: 0
     },
     providers: [],
     emails: [],
@@ -31,6 +32,7 @@ const Dashboard: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [rateLimitWarning, setRateLimitWarning] = useState('');
 
   const API_BASE = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
 
@@ -50,20 +52,35 @@ const Dashboard: React.FC = () => {
         fetch(`${API_BASE}/api/service/status`)
       ]);
 
+      // Handle rate limiting gracefully
+      const handleResponse = async (response: Response, fallbackData: any) => {
+        if (response.status === 429) {
+          const errorData = await response.json();
+          console.warn('Rate limited:', errorData.message);
+          setRateLimitWarning(`Rate limited: ${errorData.message}. Retry in ${errorData.retryAfter}s`);
+          setTimeout(() => setRateLimitWarning(''), 5000);
+          return { data: fallbackData };
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      };
+
       const [metrics, providers, emails, logs, service] = await Promise.all([
-        metricsRes.json(),
-        providersRes.json(),
-        emailsRes.json(),
-        logsRes.json(),
-        serviceRes.json()
+        handleResponse(metricsRes, data.metrics),
+        handleResponse(providersRes, data.providers), // Keep showing last known providers
+        handleResponse(emailsRes, data.emails),
+        handleResponse(logsRes, data.logs),
+        handleResponse(serviceRes, { status: data.serviceStatus })
       ]);
 
       setData({
         metrics: metrics.data || data.metrics,
-        providers: providers.data || [],
-        emails: emails.data || [],
-        logs: logs.data || [],
-        serviceStatus: service.data?.status || 'Active'
+        providers: providers.data || data.providers, // Fallback to existing data
+        emails: emails.data || data.emails,
+        logs: logs.data || data.logs,
+        serviceStatus: service.data?.status || data.serviceStatus
       });
       
       setLastRefresh(new Date());
@@ -94,6 +111,13 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Rate Limit Warning */}
+      {rateLimitWarning && (
+        <div className="rate-limit-warning">
+          ⚠️ {rateLimitWarning}
+        </div>
+      )}
 
       {/* Metrics Cards */}
       <div className="metrics-grid">
@@ -142,8 +166,12 @@ const Dashboard: React.FC = () => {
           <h2>Rate Limiting & Performance</h2>
           <div className="rate-limit-metrics">
             <div className="metric-item">
-              <span className="metric-label">Requests this minute:</span>
-              <span className="metric-value">{data.metrics.requestsThisMinute}/100</span>
+              <span className="metric-label">Email Requests (10/min limit):</span>
+              <span className="metric-value">{data.metrics.requestsThisMinute}/10</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Rate Limited Requests:</span>
+              <span className="metric-value">{data.metrics.rateLimitedRequests}</span>
             </div>
             <div className="metric-item">
               <span className="metric-label">Average Response Time:</span>

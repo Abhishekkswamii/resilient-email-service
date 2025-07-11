@@ -17,15 +17,11 @@ app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
 
-// Rate limiting
-const rateLimiter = new RateLimiter(100, 60 * 1000); // 100 requests per minute
-app.use('/api', rateLimiter.middleware());
-
 // Initialize services with renamed providers
 const providerA = new MockProviderA();
 const providerB = new MockProviderB();
 
-// Email provider names for dashboard
+// Override provider names for dashboard
 (providerA as any).name = 'Mock Email Provider A';
 (providerB as any).name = 'Mock Email Provider B';
 
@@ -33,18 +29,33 @@ const providers = [providerA, providerB];
 const emailService = new EmailService(providers);
 const emailController = new EmailController(emailService);
 
-// Routes
-app.post('/api/emails', emailController.sendEmail);
-app.get('/api/emails/:id', emailController.getEmailStatus);
-app.get('/api/emails', emailController.getAllEmails);
-app.get('/api/providers/status', emailController.getProviderStatus);
-app.get('/api/metrics', emailController.getMetrics);
-app.get('/api/logs', emailController.getSystemLogs);
-app.get('/api/service/status', emailController.getServiceStatus);
+// Tiered rate limiting strategy
+const emailSendLimiter = new RateLimiter(10, 60 * 1000, emailService); // 10 emails per minute
+const statusLimiter = new RateLimiter(60, 60 * 1000); // 60 status checks per minute
+const monitoringLimiter = new RateLimiter(120, 60 * 1000); // 120 monitoring requests per minute
 
-// Health check
+// Routes with specific rate limits
+app.post('/api/emails', emailSendLimiter.middleware(), emailController.sendEmail);
+app.get('/api/emails/:id', statusLimiter.middleware(), emailController.getEmailStatus);
+app.get('/api/emails', statusLimiter.middleware(), emailController.getAllEmails);
+
+// Monitoring endpoints with higher limits
+app.get('/api/providers/status', monitoringLimiter.middleware(), emailController.getProviderStatus);
+app.get('/api/metrics', monitoringLimiter.middleware(), emailController.getMetrics);
+app.get('/api/logs', monitoringLimiter.middleware(), emailController.getSystemLogs);
+app.get('/api/service/status', monitoringLimiter.middleware(), emailController.getServiceStatus);
+
+// Health check without rate limiting
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    rateLimits: {
+      emailSending: '10/minute',
+      statusChecks: '60/minute',
+      monitoring: '120/minute'
+    }
+  });
 });
 
 // Serve frontend in production
