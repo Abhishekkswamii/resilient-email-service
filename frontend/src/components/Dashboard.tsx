@@ -34,7 +34,8 @@ const Dashboard: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [rateLimitWarning, setRateLimitWarning] = useState('');
 
-  const API_BASE = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+  // Updated API_BASE to use environment variable REACT_APP_API_BASE_URL
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
 
   useEffect(() => {
     fetchAllData();
