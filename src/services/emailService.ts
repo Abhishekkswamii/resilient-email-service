@@ -3,6 +3,23 @@ import { EmailRequest, EmailResponse, EmailStatus, EmailProvider } from '../mode
 import { CircuitBreaker } from '../utils/circuitBreaker';
 import logger from '../utils/logger';
 
+export interface EmailMetrics {
+  totalSent: number;
+  totalFailed: number;
+  queueLength: number;
+  successRate: number;
+  averageResponseTime: number;
+  requestsThisMinute: number;
+}
+
+export interface SystemLog {
+  id: string;
+  timestamp: Date;
+  level: 'info' | 'error' | 'warn';
+  message: string;
+  service: string;
+}
+
 export class EmailService {
   private providers: EmailProvider[];
   private circuitBreakers: Map<string, CircuitBreaker>;
@@ -10,6 +27,17 @@ export class EmailService {
   private idempotencyStore: Set<string> = new Set();
   private queue: EmailRequest[] = [];
   private isProcessing = false;
+  private metrics: EmailMetrics = {
+    totalSent: 0,
+    totalFailed: 0,
+    queueLength: 0,
+    successRate: 0,
+    averageResponseTime: 0,
+    requestsThisMinute: 0
+  };
+  private systemLogs: SystemLog[] = [];
+  private responseTimeHistory: number[] = [];
+  private requestTimestamps: number[] = [];
 
   constructor(providers: EmailProvider[]) {
     this.providers = providers;
@@ -19,11 +47,58 @@ export class EmailService {
       this.circuitBreakers.set(provider.name, new CircuitBreaker());
     });
 
-    // Start queue processing
+    this.addSystemLog('info', 'EmailService initialized with providers: ' + providers.map(p => p.name).join(', '));
     this.processQueue();
+    this.startMetricsCollection();
+  }
+
+  private addSystemLog(level: 'info' | 'error' | 'warn', message: string) {
+    const log: SystemLog = {
+      id: uuidv4(),
+      timestamp: new Date(),
+      level,
+      message,
+      service: 'EmailService'
+    };
+    
+    this.systemLogs.unshift(log);
+    if (this.systemLogs.length > 100) {
+      this.systemLogs = this.systemLogs.slice(0, 100);
+    }
+    
+    logger[level](message);
+  }
+
+  private startMetricsCollection() {
+    setInterval(() => {
+      this.updateMetrics();
+    }, 1000);
+  }
+
+  private updateMetrics() {
+    const now = Date.now();
+    
+    // Clean old request timestamps (older than 1 minute)
+    this.requestTimestamps = this.requestTimestamps.filter(timestamp => now - timestamp < 60000);
+    
+    // Update metrics
+    this.metrics.queueLength = this.queue.length;
+    this.metrics.requestsThisMinute = this.requestTimestamps.length;
+    
+    // Calculate success rate
+    const totalEmails = this.metrics.totalSent + this.metrics.totalFailed;
+    this.metrics.successRate = totalEmails > 0 ? (this.metrics.totalSent / totalEmails) * 100 : 100;
+    
+    // Calculate average response time
+    if (this.responseTimeHistory.length > 0) {
+      this.metrics.averageResponseTime = this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length;
+    }
   }
 
   async sendEmail(emailData: Omit<EmailRequest, 'id' | 'timestamp'>): Promise<EmailResponse> {
+    const startTime = Date.now();
+    this.requestTimestamps.push(startTime);
+    
     const emailId = uuidv4();
     
     // Check for idempotency
@@ -38,7 +113,7 @@ export class EmailService {
         }) === idempotencyKey);
       
       if (existingEmail) {
-        logger.info(`Duplicate email detected, returning existing response: ${existingEmail.id}`);
+        this.addSystemLog('info', `Duplicate email detected, returning existing response: ${existingEmail.id}`);
         return existingEmail;
       }
     }
@@ -61,7 +136,7 @@ export class EmailService {
     this.idempotencyStore.add(idempotencyKey);
     this.queue.push(email);
 
-    logger.info(`Email ${emailId} queued for sending`);
+    this.addSystemLog('info', `Email ${emailId} queued for sending to ${emailData.to}`);
     return response;
   }
 
@@ -81,6 +156,7 @@ export class EmailService {
   }
 
   private async processEmail(email: EmailRequest) {
+    const startTime = Date.now();
     const response = this.emailStore.get(email.id);
     if (!response) return;
 
@@ -100,22 +176,30 @@ export class EmailService {
         });
 
         response.status = EmailStatus.SENT;
-        logger.info(`Email ${email.id} sent successfully via ${provider.name}`);
+        this.metrics.totalSent++;
+        
+        const responseTime = Date.now() - startTime;
+        this.responseTimeHistory.push(responseTime);
+        if (this.responseTimeHistory.length > 100) {
+          this.responseTimeHistory = this.responseTimeHistory.slice(-100);
+        }
+        
+        this.addSystemLog('info', `Email ${email.id} sent successfully via ${provider.name} in ${responseTime}ms`);
         return;
 
       } catch (error) {
-        logger.error(`Provider ${provider.name} failed for email ${email.id}: ${error}`);
+        this.addSystemLog('error', `Provider ${provider.name} failed for email ${email.id}: ${error}`);
         response.error = error instanceof Error ? error.message : 'Unknown error';
         
         if (response.attempts >= 3) {
-          continue; // Try next provider
+          continue;
         }
       }
     }
 
-    // All providers failed
     response.status = EmailStatus.FAILED;
-    logger.error(`All providers failed for email ${email.id}`);
+    this.metrics.totalFailed++;
+    this.addSystemLog('error', `All providers failed for email ${email.id}`);
   }
 
   private async sendWithRetry(email: EmailRequest, provider: EmailProvider, maxRetries: number = 3): Promise<boolean> {
@@ -128,9 +212,8 @@ export class EmailService {
           throw error;
         }
         
-        // Exponential backoff
         const delay = Math.pow(2, attempt) * 1000;
-        logger.info(`Retrying email ${email.id} in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        this.addSystemLog('warn', `Retrying email ${email.id} in ${delay}ms (attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -146,14 +229,32 @@ export class EmailService {
   }
 
   getAllEmails(): EmailResponse[] {
-    return Array.from(this.emailStore.values());
+    return Array.from(this.emailStore.values()).sort((a, b) => 
+      new Date(b.lastAttempt).getTime() - new Date(a.lastAttempt).getTime()
+    );
   }
 
   getProviderStatus() {
     return this.providers.map(provider => ({
       name: provider.name,
       healthy: provider.isHealthy(),
-      circuitState: this.circuitBreakers.get(provider.name)?.getState()
+      circuitState: this.circuitBreakers.get(provider.name)?.getState(),
+      responseTime: Math.floor(Math.random() * 200) + 50 // Mock response time
     }));
+  }
+
+  getMetrics(): EmailMetrics {
+    return { ...this.metrics };
+  }
+
+  getSystemLogs(): SystemLog[] {
+    return [...this.systemLogs];
+  }
+
+  getServiceStatus(): 'Active' | 'Inactive' | 'Degraded' {
+    const healthyProviders = this.providers.filter(p => p.isHealthy()).length;
+    if (healthyProviders === this.providers.length) return 'Active';
+    if (healthyProviders > 0) return 'Degraded';
+    return 'Inactive';
   }
 }

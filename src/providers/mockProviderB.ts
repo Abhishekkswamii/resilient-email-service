@@ -2,7 +2,7 @@ import { EmailRequest, EmailProvider } from '../models/email';
 import logger from '../utils/logger';
 
 export class MockProviderB implements EmailProvider {
-  name = 'MockProviderB';
+  name = 'Mock Email Provider B';
   private failureRate = 0.2; // 20% failure rate
   private isDown = false;
 
