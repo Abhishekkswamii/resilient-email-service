@@ -2,8 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/index.ts": {
-      "runtime": "@vercel/node@3",
-      "maxDuration": 30
+      "runtime": "@vercel/node@20.x"
     }
   },
   "buildCommand": "cd frontend && npm install && npm run build",
