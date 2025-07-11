@@ -51,6 +51,7 @@ export class EmailService {
 
     this.addSystemLog('info', 'EmailService initialized with providers: ' + providers.map(p => p.name).join(', '));
     this.addSystemLog('info', 'Rate limiting configured: 10 emails/minute, 120 monitoring requests/minute');
+    this.addSystemLog('info', 'Queue processing interval set to 6 seconds for demo visibility');
     this.processQueue();
     this.startMetricsCollection();
   }
@@ -146,7 +147,9 @@ export class EmailService {
     this.idempotencyStore.add(idempotencyKey);
     this.queue.push(email);
 
-    this.addSystemLog('info', `Email ${emailId} queued for sending to ${emailData.to}`);
+    // Enhanced logging for demo visibility
+    this.addSystemLog('info', `Email ${emailId} queued for sending to ${emailData.to}. Queue length: ${this.queue.length}`);
+    
     return response;
   }
 
@@ -158,11 +161,12 @@ export class EmailService {
       const email = this.queue.shift();
       
       if (email) {
+        this.addSystemLog('info', `Processing email ${email.id} from queue. Remaining queue length: ${this.queue.length}`);
         await this.processEmail(email);
       }
       
       this.isProcessing = false;
-    }, 1000);
+    }, 6000); // Changed from 1000ms (1 second) to 6000ms (6 seconds) for demo visibility
   }
 
   private async processEmail(email: EmailRequest) {
@@ -180,6 +184,8 @@ export class EmailService {
       try {
         response.attempts++;
         response.provider = provider.name;
+        
+        this.addSystemLog('info', `Attempting to send email ${email.id} via ${provider.name} (attempt ${response.attempts})`);
         
         await circuitBreaker.execute(async () => {
           return await this.sendWithRetry(email, provider);
@@ -202,6 +208,7 @@ export class EmailService {
         response.error = error instanceof Error ? error.message : 'Unknown error';
         
         if (response.attempts >= 3) {
+          this.addSystemLog('warn', `Max attempts reached for ${provider.name}, trying next provider for email ${email.id}`);
           continue;
         }
       }
@@ -209,7 +216,7 @@ export class EmailService {
 
     response.status = EmailStatus.FAILED;
     this.metrics.totalFailed++;
-    this.addSystemLog('error', `All providers failed for email ${email.id}`);
+    this.addSystemLog('error', `All providers failed for email ${email.id} after ${response.attempts} attempts`);
   }
 
   private async sendWithRetry(email: EmailRequest, provider: EmailProvider, maxRetries: number = 3): Promise<boolean> {
@@ -223,7 +230,7 @@ export class EmailService {
         }
         
         const delay = Math.pow(2, attempt) * 1000;
-        this.addSystemLog('warn', `Retrying email ${email.id} in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        this.addSystemLog('warn', `Retrying email ${email.id} via ${provider.name} in ${delay}ms (attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
