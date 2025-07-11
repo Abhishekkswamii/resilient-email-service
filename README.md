@@ -1,374 +1,264 @@
-Resilient Email Service
-A production-ready, fault-tolerant email sending service built with TypeScript, featuring robust resilience patterns and basic monitoring capabilities.
-🚀 Features
+# 📧 Resilient Email Service
 
-🔄 Automatic Failover: Seamlessly switches between two mock email providers
-⚡ Smart Retry Logic: Implements exponential backoff for failed attempts
-🛡️ Idempotency: Prevents duplicate email sends using unique keys
-📏 Rate Limiting: Controls email sending rate to prevent abuse
-📊 Status Tracking: Monitors email sending attempts and outcomes
-🔌 Circuit Breaker: Protects against cascading failures
-📝 Basic Logging: Tracks system operations and errors
-📋 Queue System: Manages email sending with a simple in-memory queue
+A **production-grade**, fault-tolerant email service built using **TypeScript**, **Express**, and **React**. It ensures reliable email delivery by incorporating **resilience patterns** such as **automatic failover**, **retry with exponential backoff**, **rate limiting**, **idempotency**, and **real-time monitoring**.
 
-📋 Table of Contents
+---
 
-Quick Start
-Architecture
-API Reference
-Configuration
-Testing
-Deployment
-Monitoring
-Contributing
-License
+## 🚀 Key Features
 
-🏃 Quick Start
-Prerequisites
+- 🔄 **Retry with Exponential Backoff**  
+  Automatically retries failed email requests with backoff intervals.
 
-Node.js 16+ and npm 8+
-Git for version control
+- 🔁 **Fallback Provider Switching**  
+  If the primary provider fails, the service automatically switches to a secondary one.
 
-Installation
+- 🔐 **Idempotent Requests**  
+  Duplicate prevention using content-based keys.
+
+- 🛡️ **Basic Rate Limiting**  
+  Prevents abuse with per-minute email request limits.
+
+- ⚡ **Circuit Breaker**  
+  Avoids repeated failures by blocking failing providers temporarily.
+
+- ⏳ **Queue System**  
+  Emails are processed in the background from a queue.
+
+- 📊 **Real-time Dashboard**  
+  Visual monitoring of provider status, metrics, queue length, and logs.
+
+- 🧪 **Unit Tests with Coverage Reports**  
+  Ensures correctness and reliability.
+
+---
+
+## 🏗️ Project Structure
+
+```
+resilient-email-service/
+├── backend/ (src/)
+│   ├── controllers/         # API request handlers
+│   ├── services/            # EmailService, queue, retry logic
+│   ├── providers/           # MockProviderA / MockProviderB
+│   ├── middleware/          # Rate limiting
+│   ├── models/              # Type definitions
+│   ├── utils/               # Logger, circuit breaker
+│   ├── tests/               # Unit tests
+│   └── server.ts / app.ts   # Express entry
+├── frontend/
+│   ├── public/              # Static assets
+│   ├── src/
+│   │   ├── components/      # Dashboard, StatusTable, Logs, Form
+│   │   ├── styles/          # CSS
+│   │   └── App.tsx          # React App entry
+├── Dockerfile / docker-compose.yml
+├── .env / tsconfig.json / package.json
+├── README.md / LICENSE / CHANGELOG.md
+```
+
+---
+
+## 🔧 System Flow
+
+```
+📱 Frontend Dashboard
+    ↓ API Calls
+🌐 Express Router
+    ↓ Middleware
+🛡️ Rate Limiter
+    ↓ Controller
+🎮 Email Controller
+    ↓ Service Layer
+🔧 Email Service
+    ↓ Queue System
+⏳ Processing Queue
+    ↓ Provider Selection
+📧 Mock Providers
+    ↓ Circuit Breaker
+⚡ Failure Protection
+    ↓ Retry Logic
+🔄 Exponential Backoff
+    ↓ Status Update
+📊 Metrics Collection
+    ↓ Real-time Updates
+📱 Dashboard Display
+```
+
+---
+
+## 🏁 Quick Start
+
+### Prerequisites
+
+- Node.js v16+
+- npm v8+
+- Git
+- Modern web browser
+
+### Installation
+
+```bash
 # 1. Clone the repository
 git clone https://github.com/yourusername/resilient-email-service.git
 cd resilient-email-service
 
-# 2. Install dependencies
+# 2. Install backend dependencies
 npm install
 
-# 3. Build and start the service
-npm run build
-npm run start
+# 3. Install frontend dependencies
+cd frontend
+npm install
+cd ..
 
-Verification
+# 4. Run backend and frontend in dev mode
+npm run dev             # Starts backend on http://localhost:3001
+cd frontend && npm start   # Starts frontend on http://localhost:3000
+```
 
-Health Check: Visit http://localhost:3000/api/health to confirm service is running
-Expected Output: {"status": "healthy"}
+---
 
-🏗️ Architecture
-System Overview
-graph TB
-    A[Client] --> B[Express API Server]
-    B --> C[Rate Limiter]
-    B --> D[Email Service]
-    D --> E[Queue System]
-    D --> F[Circuit Breaker]
-    F --> G[Mock Provider A]
-    F --> H[Mock Provider B]
-    D --> I[Logger]
+## 📬 API Reference
 
-Core Components
+### Base URL
 
+- Dev: `http://localhost:3001/api`
 
+### Endpoints
 
-Component
-Responsibility
-Technology
+#### ➕ Send Email
 
-
-
-EmailService
-Orchestrates email delivery
-TypeScript Class
-
-
-MockProviders
-Simulates email services
-Interface Pattern
-
-
-CircuitBreaker
-Prevents cascading failures
-State Machine
-
-
-RateLimiter
-Controls request rates
-Express Middleware
-
-
-QueueSystem
-Manages email processing
-In-memory Queue
-
-
-Logger
-Tracks operations and errors
-Console-based
-
-
-Resilience Patterns
-
-Retry Logic: Exponential backoff (1s → 2s → 4s)
-Failover: Switches to secondary provider on failure
-Circuit Breaker: Opens after 5 failures, resets after 30s
-Rate Limiting: 10 emails per minute
-Idempotency: Uses content-based keys to prevent duplicates
-
-📡 API Reference
-Base URL
-
-Development: http://localhost:3000/api
-Production: https://your-domain.com/api
-
-Core Endpoints
-Send Email
+```http
 POST /api/emails
-Content-Type: application/json
+```
 
+**Body:**
+```json
 {
   "to": "recipient@example.com",
   "from": "sender@example.com",
-  "subject": "Test Subject",
-  "body": "Email content"
+  "subject": "Test Email",
+  "body": "Hello World"
 }
+```
 
-Response (202 Accepted)
+**Response:**
+```json
 {
   "message": "Email queued for sending",
   "data": {
-    "id": "abc123-def456",
-    "status": "pending",
-    "attempts": 0,
-    "lastAttempt": "2025-07-11T14:33:00Z"
+    "id": "abc123",
+    "status": "pending"
   }
 }
+```
 
-Get Email Status
-GET /api/emails/{emailId}
+#### 📥 Get Email Status
 
-Get All Emails
+```http
+GET /api/emails/:id
+```
+
+#### 📋 List All Emails
+
+```http
 GET /api/emails
+```
 
-Get System Status
+#### 📈 System Metrics
+
+```http
+GET /api/metrics
+```
+
+#### 🏥 Health Check
+
+```http
 GET /api/health
+```
 
-Response
-{
-  "status": "healthy"
-}
+---
 
-Status Codes
+## 🧪 Testing
 
+### Run tests
 
-
-Code
-Meaning
-Description
-
-
-
-200
-OK
-Successful request
-
-
-202
-Accepted
-Email queued successfully
-
-
-400
-Bad Request
-Invalid input data
-
-
-429
-Too Many Requests
-Rate limit exceeded
-
-
-500
-Internal Error
-System error
-
-
-⚙️ Configuration
-Environment Variables
-Create a .env file in the project root:
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# Rate Limiting
-EMAIL_RATE_LIMIT=10    # Emails per minute
-
-# Queue Processing
-QUEUE_PROCESS_INTERVAL=5000  # Processing interval (ms)
-
-# Circuit Breaker
-CIRCUIT_FAILURE_THRESHOLD=5  # Failures before opening
-CIRCUIT_RESET_TIMEOUT=30000  # Reset timeout (ms)
-
-# Logging
-LOG_LEVEL=info
-
-Provider Configuration
-Mock providers are configured in src/providers/:
-// MockProviderA
-private failureRate = 0.2;  // 20% failure rate
-
-// MockProviderB
-private failureRate = 0.1;  // 10% failure rate
-
-🧪 Testing
-Running Tests
-# Run all tests
+```bash
 npm test
+```
 
-# With coverage
+### Coverage report
+
+```bash
 npm run test:coverage
+```
 
-# Watch mode
-npm run test:watch
+---
 
-Test Coverage
+## ⚙️ Configuration
 
+Create a `.env` file in the root:
 
+```env
+PORT=3001
+EMAIL_RATE_LIMIT=10
+STATUS_RATE_LIMIT=60
+QUEUE_PROCESS_INTERVAL=6000
+CIRCUIT_FAILURE_THRESHOLD=5
+CIRCUIT_TIMEOUT=60000
+LOG_LEVEL=info
+```
 
-Component
-Coverage
-Status
+---
 
+---
 
+## 📊 Dashboard Metrics
 
-EmailService
-95%+
-✅
+View metrics at: `http://localhost:3000`
 
+- ✅ Email sent/failed
+- ✅ Queue length
+- ✅ Response times
+- ✅ Provider health
+- ✅ Logs in real-time
 
-RateLimiter
-90%+
-✅
+---
 
+## 📄 Assumptions
 
-CircuitBreaker
-90%+
-✅
+- Emails are simulated using mock providers.
+- In-memory storage is used for queue/status (no database).
+- Focus is on demonstrating **resilience patterns** and **SOLID design**.
 
+---
 
-MockProviders
-85%+
-✅
+## 🧠 Design Principles
 
+- ✅ SOLID principles
+- ✅ Clean separation of concerns
+- ✅ Minimal external libraries
+- ✅ Full TypeScript typing
 
-Test Examples
-test('prevents duplicate emails', async () => {
-  const email = {
-    to: 'test@example.com',
-    from: 'sender@example.com',
-    subject: 'Test',
-    body: 'Content'
-  };
-  const result1 = await emailService.sendEmail(email);
-  const result2 = await emailService.sendEmail(email);
-  expect(result1.id).toEqual(result2.id);
-});
+---
 
-test('enforces rate limiting', async () => {
-  const responses = await Promise.all(
-    Array.from({ length: 11 }, () => sendEmailRequest())
-  );
-  expect(responses[10].status).toBe(429);
-});
+## 🤝 Contributing
 
-🚀 Deployment
-Cloud Platforms
-Heroku
-heroku create your-app-name
-heroku config:set NODE_ENV=production
-git push heroku main
-
-Vercel
-vercel --prod
-
-AWS/DigitalOcean
-
-Deploy using Node.js runtime
-Configure load balancer and auto-scaling
-Set up monitoring and alerting
-
-Production Checklist
-
-Configure environment variables
-Enable HTTPS with SSL certificates
-Set up monitoring and alerting
-Configure log aggregation
-Tune rate limits for production
-Establish backup procedures
-
-📊 Monitoring
-Key Metrics
-
-Service Uptime: Target 99.9%
-Success Rate: Target >95%
-Queue Length: Alert if >50
-Response Time: Alert if >1000ms
-
-Alerting Setup
-Monitor for:
-
-Service downtime > 1 minute
-Success rate < 90% for 5 minutes
-Circuit breaker in OPEN state
-Queue processing delays
-
-Troubleshooting
-Connection Issues
-# Check service status
-curl http://localhost:3000/api/health
-
-# Restart service
-npm run start
-
-Rate Limiting Errors
-
-Symptom: 429 "Too Many Requests"
-Solution: Wait 1 minute or adjust EMAIL_RATE_LIMIT
-
-Provider Issues
-
-Symptom: Emails failing consistently
-Solution: Check logs and provider health via /api/health
-
-🤝 Contributing
-Development Setup
-# Fork and clone
+```bash
+# Fork the repo
 git clone https://github.com/yourusername/resilient-email-service.git
-cd resilient-email-service
-
-# Create feature branch
-git checkout -b feature/your-feature
-
-# Install dependencies
+git checkout -b feature/awesome-feature
 npm install
-
-# Run tests
 npm test
-
-# Start development
-npm run start
-
-Code Standards
-
-Use TypeScript with strict mode
-Follow ESLint rules
-Maintain 90%+ test coverage
-Update documentation for new features
-
-Pull Request Process
-
-Create feature branch from main
-Implement changes with tests
-Update documentation
-Submit PR with detailed description
-Ensure CI/CD checks pass
+```
 
 
-📞 Support
 
-Email: abhishekswami3330@gmail.com
-Linkedin: linkedin.com/in/abhishekswamii/
 
-Built with ❤️ using TypeScript and Express.js
+## 📞 Support
+
+- Issues: [GitHub Issues](https://github.com/Abhishekkswamii/resilient-email-service/issues)
+- Email: abhishekswami3330@gmail.com
+
+---
+
+> Built with ❤️ using TypeScript, Express.js, and React
