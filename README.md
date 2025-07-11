@@ -1,209 +1,374 @@
-# Resilient Email Service
+Resilient Email Service
+A production-ready, fault-tolerant email sending service built with TypeScript, featuring robust resilience patterns and basic monitoring capabilities.
+🚀 Features
 
-A robust email sending service with retry logic, fallback mechanisms, circuit breakers, and rate limiting.
+🔄 Automatic Failover: Seamlessly switches between two mock email providers
+⚡ Smart Retry Logic: Implements exponential backoff for failed attempts
+🛡️ Idempotency: Prevents duplicate email sends using unique keys
+📏 Rate Limiting: Controls email sending rate to prevent abuse
+📊 Status Tracking: Monitors email sending attempts and outcomes
+🔌 Circuit Breaker: Protects against cascading failures
+📝 Basic Logging: Tracks system operations and errors
+📋 Queue System: Manages email sending with a simple in-memory queue
 
-## Features
+📋 Table of Contents
 
-- ✅ **Retry Logic**: Exponential backoff for failed attempts
-- ✅ **Fallback Mechanism**: Automatic provider switching on failure
-- ✅ **Idempotency**: Prevents duplicate email sends
-- ✅ **Rate Limiting**: Protects against spam and abuse
-- ✅ **Status Tracking**: Real-time email delivery status
-- ✅ **Circuit Breaker**: Prevents cascading failures
-- ✅ **Queue System**: Asynchronous email processing
-- ✅ **Logging**: Comprehensive logging with Winston
-- ✅ **Unit Tests**: Full test coverage with Jest
+Quick Start
+Architecture
+API Reference
+Configuration
+Testing
+Deployment
+Monitoring
+Contributing
+License
 
-## Tech Stack
+🏃 Quick Start
+Prerequisites
 
-- **Backend**: Node.js, Express.js, TypeScript
-- **Frontend**: React, TypeScript
-- **Testing**: Jest, Supertest
-- **Logging**: Winston
-- **Deployment**: Docker, Heroku/Vercel ready
+Node.js 16+ and npm 8+
+Git for version control
 
-## Setup Instructions
-
-### Prerequisites
-
-- Node.js 16+ and npm
-- Git
-
-### Local Development
-
-1. **Clone the repository**
-git clone <your-repo-url>
+Installation
+# 1. Clone the repository
+git clone https://github.com/yourusername/resilient-email-service.git
 cd resilient-email-service
 
-text
-
-2. **Install backend dependencies**
+# 2. Install dependencies
 npm install
 
-text
-
-3. **Install frontend dependencies**
-cd frontend
-npm install
-cd ..
-
-text
-
-4. **Build the project**
+# 3. Build and start the service
 npm run build
+npm run start
 
-text
+Verification
 
-5. **Run tests**
-npm test
+Health Check: Visit http://localhost:3000/api/health to confirm service is running
+Expected Output: {"status": "healthy"}
 
-text
+🏗️ Architecture
+System Overview
+graph TB
+    A[Client] --> B[Express API Server]
+    B --> C[Rate Limiter]
+    B --> D[Email Service]
+    D --> E[Queue System]
+    D --> F[Circuit Breaker]
+    F --> G[Mock Provider A]
+    F --> H[Mock Provider B]
+    D --> I[Logger]
 
-6. **Start development server**
-npm run dev
+Core Components
 
-text
 
-7. **Start frontend (in another terminal)**
-cd frontend
-npm start
 
-text
+Component
+Responsibility
+Technology
 
-The API will be available at `http://localhost:3001` and the frontend at `http://localhost:3000`.
 
-## API Endpoints
 
-### Send Email
+EmailService
+Orchestrates email delivery
+TypeScript Class
+
+
+MockProviders
+Simulates email services
+Interface Pattern
+
+
+CircuitBreaker
+Prevents cascading failures
+State Machine
+
+
+RateLimiter
+Controls request rates
+Express Middleware
+
+
+QueueSystem
+Manages email processing
+In-memory Queue
+
+
+Logger
+Tracks operations and errors
+Console-based
+
+
+Resilience Patterns
+
+Retry Logic: Exponential backoff (1s → 2s → 4s)
+Failover: Switches to secondary provider on failure
+Circuit Breaker: Opens after 5 failures, resets after 30s
+Rate Limiting: 10 emails per minute
+Idempotency: Uses content-based keys to prevent duplicates
+
+📡 API Reference
+Base URL
+
+Development: http://localhost:3000/api
+Production: https://your-domain.com/api
+
+Core Endpoints
+Send Email
 POST /api/emails
 Content-Type: application/json
 
 {
-"to": "recipient@example.com",
-"from": "sender@example.com",
-"subject": "Test Email",
-"body": "This is a test email"
+  "to": "recipient@example.com",
+  "from": "sender@example.com",
+  "subject": "Test Subject",
+  "body": "Email content"
 }
 
-text
+Response (202 Accepted)
+{
+  "message": "Email queued for sending",
+  "data": {
+    "id": "abc123-def456",
+    "status": "pending",
+    "attempts": 0,
+    "lastAttempt": "2025-07-11T14:33:00Z"
+  }
+}
 
-### Get Email Status
-GET /api/emails/:id
+Get Email Status
+GET /api/emails/{emailId}
 
-text
-
-### Get All Emails
+Get All Emails
 GET /api/emails
 
-text
-
-### Get Provider Status
-GET /api/providers/status
-
-text
-
-### Health Check
+Get System Status
 GET /api/health
 
-text
+Response
+{
+  "status": "healthy"
+}
 
-## Architecture
+Status Codes
 
-### Core Components
 
-1. **EmailService**: Main service orchestrating email sending
-2. **MockProviders**: Simulated email providers with configurable failure rates
-3. **CircuitBreaker**: Prevents calls to failing services
-4. **RateLimiter**: Controls request frequency
-5. **Queue System**: Asynchronous email processing
 
-### Design Patterns
+Code
+Meaning
+Description
 
-- **Strategy Pattern**: Interchangeable email providers
-- **Circuit Breaker Pattern**: Fault tolerance
-- **Queue Pattern**: Asynchronous processing
-- **Singleton Pattern**: Service instances
 
-## Configuration
 
-### Environment Variables
+200
+OK
+Successful request
 
-- `PORT`: Server port (default: 3001)
-- `NODE_ENV`: Environment (development/production)
 
-### Rate Limiting
+202
+Accepted
+Email queued successfully
 
-- Default: 100 requests per 15 minutes
-- Configurable in `src/middleware/rateLimiter.ts`
 
-### Circuit Breaker
+400
+Bad Request
+Invalid input data
 
-- Failure threshold: 5 failures
-- Timeout: 60 seconds
-- Configurable in `src/utils/circuitBreaker.ts`
 
-## Testing
+429
+Too Many Requests
+Rate limit exceeded
 
-Run all tests:
+
+500
+Internal Error
+System error
+
+
+⚙️ Configuration
+Environment Variables
+Create a .env file in the project root:
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# Rate Limiting
+EMAIL_RATE_LIMIT=10    # Emails per minute
+
+# Queue Processing
+QUEUE_PROCESS_INTERVAL=5000  # Processing interval (ms)
+
+# Circuit Breaker
+CIRCUIT_FAILURE_THRESHOLD=5  # Failures before opening
+CIRCUIT_RESET_TIMEOUT=30000  # Reset timeout (ms)
+
+# Logging
+LOG_LEVEL=info
+
+Provider Configuration
+Mock providers are configured in src/providers/:
+// MockProviderA
+private failureRate = 0.2;  // 20% failure rate
+
+// MockProviderB
+private failureRate = 0.1;  // 10% failure rate
+
+🧪 Testing
+Running Tests
+# Run all tests
 npm test
 
-text
-
-Run tests with coverage:
+# With coverage
 npm run test:coverage
 
-text
-
-Run tests in watch mode:
+# Watch mode
 npm run test:watch
 
-text
+Test Coverage
 
-## Deployment
 
-### Docker
 
-1. **Build Docker image**
-docker build -t resilient-email-service .
+Component
+Coverage
+Status
 
-text
 
-2. **Run container**
-docker run -p 3001:3001 resilient-email-service
 
-text
+EmailService
+95%+
+✅
 
-### Heroku
 
-1. **Install Heroku CLI**
-2. **Login and create app**
-heroku login
+RateLimiter
+90%+
+✅
+
+
+CircuitBreaker
+90%+
+✅
+
+
+MockProviders
+85%+
+✅
+
+
+Test Examples
+test('prevents duplicate emails', async () => {
+  const email = {
+    to: 'test@example.com',
+    from: 'sender@example.com',
+    subject: 'Test',
+    body: 'Content'
+  };
+  const result1 = await emailService.sendEmail(email);
+  const result2 = await emailService.sendEmail(email);
+  expect(result1.id).toEqual(result2.id);
+});
+
+test('enforces rate limiting', async () => {
+  const responses = await Promise.all(
+    Array.from({ length: 11 }, () => sendEmailRequest())
+  );
+  expect(responses[10].status).toBe(429);
+});
+
+🚀 Deployment
+Cloud Platforms
+Heroku
 heroku create your-app-name
-
-text
-
-3. **Deploy**
+heroku config:set NODE_ENV=production
 git push heroku main
 
-text
+Vercel
+vercel --prod
 
-## Assumptions
+AWS/DigitalOcean
 
-1. **Mock Providers**: Using simulated email providers instead of real services
-2. **In-Memory Storage**: Email status stored in memory (use database in production)
-3. **Rate Limiting**: IP-based rate limiting (consider user-based in production)
-4. **Security**: Basic security measures (add authentication in production)
+Deploy using Node.js runtime
+Configure load balancer and auto-scaling
+Set up monitoring and alerting
 
-## Future Enhancements
+Production Checklist
 
-- [ ] Database integration (PostgreSQL/MongoDB)
-- [ ] User authentication and authorization
-- [ ] Email templates and personalization
-- [ ] Webhook notifications
-- [ ] Metrics and monitoring dashboard
-- [ ] Email scheduling
-- [ ] Attachment support
+Configure environment variables
+Enable HTTPS with SSL certificates
+Set up monitoring and alerting
+Configure log aggregation
+Tune rate limits for production
+Establish backup procedures
 
-## License
+📊 Monitoring
+Key Metrics
 
-MIT License
+Service Uptime: Target 99.9%
+Success Rate: Target >95%
+Queue Length: Alert if >50
+Response Time: Alert if >1000ms
+
+Alerting Setup
+Monitor for:
+
+Service downtime > 1 minute
+Success rate < 90% for 5 minutes
+Circuit breaker in OPEN state
+Queue processing delays
+
+Troubleshooting
+Connection Issues
+# Check service status
+curl http://localhost:3000/api/health
+
+# Restart service
+npm run start
+
+Rate Limiting Errors
+
+Symptom: 429 "Too Many Requests"
+Solution: Wait 1 minute or adjust EMAIL_RATE_LIMIT
+
+Provider Issues
+
+Symptom: Emails failing consistently
+Solution: Check logs and provider health via /api/health
+
+🤝 Contributing
+Development Setup
+# Fork and clone
+git clone https://github.com/yourusername/resilient-email-service.git
+cd resilient-email-service
+
+# Create feature branch
+git checkout -b feature/your-feature
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Start development
+npm run start
+
+Code Standards
+
+Use TypeScript with strict mode
+Follow ESLint rules
+Maintain 90%+ test coverage
+Update documentation for new features
+
+Pull Request Process
+
+Create feature branch from main
+Implement changes with tests
+Update documentation
+Submit PR with detailed description
+Ensure CI/CD checks pass
+
+
+📞 Support
+
+Email: abhishekswami3330@gmail.com
+Linkedin: linkedin.com/in/abhishekswamii/
+
+Built with ❤️ using TypeScript and Express.js
