@@ -1,17 +1,34 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/*.ts": {
-      "runtime": "nodejs18.x"
+    "api/index.ts": {
+      "runtime": "@vercel/node@18.x",
+      "maxDuration": 30
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
+      "dest": "/api/index.ts"
+    }
+  ],
+  "headers": [
     {
-      "src": "/(.*)",
-      "dest": "/frontend/build/$1"
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://reilient-email-service.netlify.app"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
     }
   ]
 }
