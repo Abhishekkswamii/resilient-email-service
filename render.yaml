@@ -1,7 +1,7 @@
 services:
   - type: web
-    name: resilient-email-service
-    runtime: node
+    name: resilient-email-service-api
+    env: node
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
@@ -9,26 +9,23 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-      - key: CORS_ORIGIN
-        value: https://your-frontend-domain.netlify.app
+      - key: EMAIL_RATE_LIMIT
+        value: 10
+      - key: STATUS_RATE_LIMIT
+        value: 60
+      - key: MONITORING_RATE_LIMIT
+        value: 120
+      - key: QUEUE_PROCESS_INTERVAL
+        value: 6000
+      - key: CIRCUIT_FAILURE_THRESHOLD
+        value: 5
+      - key: CIRCUIT_TIMEOUT
+        value: 60000
       - key: LOG_LEVEL
         value: info
-      - key: RATE_LIMIT_EMAIL_REQUESTS
-        value: 10
-      - key: RATE_LIMIT_STATUS_REQUESTS
-        value: 60
-      - key: RATE_LIMIT_MONITORING_REQUESTS
-        value: 120
-      - key: CIRCUIT_BREAKER_THRESHOLD
-        value: 5
-      - key: CIRCUIT_BREAKER_TIMEOUT
-        value: 60000
-      - key: CIRCUIT_BREAKER_RESET_TIMEOUT
-        value: 30000
-    # Add any additional environment variables here
-    # - key: SENDGRID_API_KEY
-    #   sync: false  # This will require manual entry in Render dashboard
-    # - key: MAILGUN_API_KEY
-    #   sync: false
+      - key: PROVIDER_A_FAILURE_RATE
+        value: 0.3
+      - key: PROVIDER_B_FAILURE_RATE
+        value: 0.2
+      - key: CORS_ORIGIN
+        value: https://reilient-email-service.netlify.app

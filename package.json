@@ -2,9 +2,9 @@
   "name": "resilient-email-service",
   "version": "1.0.0",
   "description": "A robust email sending service with retry logic, fallback mechanisms, circuit breakers, and rate limiting",
-  "main": "api/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node api/index.js",
+    "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "test": "jest",
@@ -12,7 +12,7 @@
     "test:coverage": "jest --coverage",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
-    "vercel-build": "npm run build"
+    "postinstall": "npm run build"
   },
   "keywords": [
     "email",
@@ -24,8 +24,7 @@
     "rate-limiting",
     "typescript",
     "express",
-    "serverless",
-    "vercel"
+    "render"
   ],
   "author": "Abhishek Swami <your.email@example.com>",
   "license": "MIT",
@@ -58,7 +57,6 @@
     "@types/node": "^20.9.0",
     "@types/supertest": "^2.0.16",
     "@types/uuid": "^9.0.7",
-    "@vercel/node": "^3.0.0",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
     "rimraf": "^6.0.1",
